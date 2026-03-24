@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ETHERMONY | The Unified Study Ecosystem</title>
+  <title>ETHERMONY | AI Study Ecosystem</title>
   
   <link rel="icon" type="image/jpeg" href="ETHERMONY.jpeg">
   
@@ -19,6 +19,9 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/framer-motion@11.0.8/dist/framer-motion.js"></script>
 
+  <!-- PUTER.JS - Primary Zero-Config Keyless AI Engine -->
+  <script src="https://js.puter.com/v2/"></script>
+
   <!-- Tailwind Config & Custom Animations -->
   <script>
     tailwind.config = {
@@ -33,7 +36,7 @@
           animation: {
             "fade-in-up": "fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
             "fade-in": "fadeIn 0.4s ease forwards",
-            "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+            "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite"
           },
           keyframes: {
             fadeInUp: {
@@ -51,42 +54,87 @@
   </script>
 
   <style>
-    body { background-color: #030712; color: #f9fafb; font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; margin: 0; padding: 0; }
+    /* Global Base Styles adjusting for Light/Dark Mode */
+    body { font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; margin: 0; padding: 0; transition: background-color 0.3s, color 0.3s; }
+    html.dark body { background-color: #030712; color: #f9fafb; }
+    html:not(.dark) body { background-color: #f3f4f6; color: #111827; }
     
-    spline-viewer::part(logo) { display: none !important; opacity: 0 !important; pointer-events: none !important; }
-    spline-viewer::part(watermark) { display: none !important; opacity: 0 !important; pointer-events: none !important; }
-    
-    .spline-watermark-clip {
-      clip-path: polygon(0 0, 100% 0, 100% calc(100% - 70px), calc(100% - 200px) calc(100% - 70px), calc(100% - 200px) 100%, 0 100%);
-    }
+    spline-viewer::part(logo), spline-viewer::part(watermark) { display: none !important; opacity: 0 !important; pointer-events: none !important; }
+    .spline-watermark-clip { clip-path: polygon(0 0, 100% 0, 100% calc(100% - 70px), calc(100% - 200px) calc(100% - 70px), calc(100% - 200px) 100%, 0 100%); }
 
-    .glass-nav {
-      background: rgba(3, 7, 18, 0.4);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
+    /* Glassmorphism adjustments for Light/Dark */
+    html.dark .glass-nav { background: rgba(3, 7, 18, 0.6); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    html:not(.dark) .glass-nav { background: rgba(255, 255, 255, 0.8); border-bottom: 1px solid rgba(0, 0, 0, 0.05); }
+    .glass-nav { backdrop-filter: blur(16px); }
     
-    /* Custom Scrollbar for Workspace */
+    /* Scrollbars */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+    html.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    html:not(.dark) ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 10px; }
   </style>
 </head>
 <body>
+
+  <!-- ANTI-BLANK SCREEN SAFEGUARD -->
+  <div id="crash-fallback" style="display:none; padding: 40px; text-align: center; font-family: sans-serif; color: #ef4444; background: #fee2e2; min-height: 100vh;">
+    <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">Critical App Loading Error</h2>
+    <p id="crash-message" style="font-size: 16px;">The application failed to compile.</p>
+    <p style="font-size: 14px; margin-top: 20px; color: #7f1d1d;">Try disabling adblockers or strict tracking prevention, as they can block Firebase CDNs.</p>
+  </div>
+
+  <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      if (document.getElementById('root').innerHTML === "") {
+        document.getElementById('root').style.display = 'none';
+        document.getElementById('crash-fallback').style.display = 'block';
+        document.getElementById('crash-message').innerText = msg + ' (Line: ' + lineNo + ')';
+      }
+      return false;
+    };
+  </script>
+
+  <!-- RECAPTCHA CONTAINER -->
+  <div id="recaptcha-container" class="fixed bottom-4 right-4 z-[9999]"></div>
+  
   <div id="root"></div>
 
   <script type="text/babel" data-type="module">
+    // --- FIREBASE IMPORTS ---
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getAuth, onAuthStateChanged, createUserWithEmailAndPassword, 
+      signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, 
+      updateProfile, RecaptchaVerifier, signInWithPhoneNumber, signOut 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
+      doc, setDoc, updateDoc, getDoc, increment, limit
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- CONFIGURATION ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAIFE5gkf4aGuS2yqcziIDhL61O0HF_GlI",
+      authDomain: "ethermony-dfd5d.firebaseapp.com",
+      projectId: "ethermony-dfd5d",
+      storageBucket: "ethermony-dfd5d.firebasestorage.app",
+      messagingSenderId: "1077445135050",
+      appId: "1:1077445135050:web:ef8e3e78ab373a2e9a4233"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const googleProvider = new GoogleAuthProvider();
+    const safeAppId = typeof __app_id !== 'undefined' ? __app_id : 'ethermony-dfd5d';
+
+    // --- REACT SETUP ---
     const { useState, useEffect, useRef } = React;
     const { motion } = window.Motion;
-
-    // --- UTILITIES ---
     const cn = (...classes) => classes.filter(Boolean).join(' ');
 
     // --- ICONS ---
-    const Icon = ({ children, className = "" }) => (
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
-    );
+    const Icon = ({ children, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>;
     const Brain = ({ className }) => <Icon className={className}><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5A3 3 0 0 0 13.6 4"/><path d="M6.401 6.5A3 3 0 0 1 10.4 4"/></Icon>;
     const Sparkles = ({ className }) => <Icon className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></Icon>;
     const Mail = ({ className }) => <Icon className={className}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></Icon>;
@@ -94,13 +142,22 @@
     const UserIcon = ({ className }) => <Icon className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></Icon>;
     const PhoneIcon = ({ className }) => <Icon className={className}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></Icon>;
     const ArrowLeft = ({ className }) => <Icon className={className}><path d="m15 18-6-6 6-6"/></Icon>;
-    const LayoutDashboard = ({ className }) => <Icon className={className}><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></Icon>;
     const MessageSquare = ({ className }) => <Icon className={className}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Icon>;
     const Users = ({ className }) => <Icon className={className}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
     const LogOut = ({ className }) => <Icon className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></Icon>;
     const Send = ({ className }) => <Icon className={className}><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></Icon>;
     const PlayCircle = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></Icon>;
     const FileQuestion = ({ className }) => <Icon className={className}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><circle cx="12" cy="17" r="1"/><path d="M12 13v-1c0-1 1.5-1.5 2-2.5a2 2 0 1 0-4 0"/></Icon>;
+    const Edit3 = ({ className }) => <Icon className={className}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></Icon>;
+    const PenTool = ({ className }) => <Icon className={className}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></Icon>;
+    const ImageIcon = ({ className }) => <Icon className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></Icon>;
+    const Plus = ({ className }) => <Icon className={className}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>;
+    const CheckCircle = ({ className }) => <Icon className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></Icon>;
+    const XCircle = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="10"/><line x1="15" x2="9" y1="9" y2="15"/><line x1="9" x2="15" y1="9" y2="15"/></Icon>;
+    const Trophy = ({ className }) => <Icon className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></Icon>;
+    const ClockIcon = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+    const Sun = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>;
+    const Moon = ({ className }) => <Icon className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>;
 
     const GoogleIcon = ({ className }) => (
       <svg className={className} viewBox="0 0 24 24">
@@ -111,36 +168,24 @@
       </svg>
     );
 
-    // --- NEW: REUSABLE ETHERMONY LOGO COMPONENT ---
     const EthermonyLogo = ({ className = "w-8 h-8", fallbackSize = "w-5 h-5" }) => (
-      <div className={cn("flex items-center justify-center bg-white/5 border border-white/10 shadow-inner overflow-hidden relative", className)}>
-        <img 
-          src="ETHERMONY.jpeg" 
-          alt="ETHERMONY Logo" 
-          className="w-full h-full object-cover relative z-10" 
-          onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'block'; }}
-        />
-        <Brain className={cn("text-white absolute hidden z-0", fallbackSize)} />
+      <div className={cn("flex items-center justify-center bg-purple-600/10 border border-purple-500/20 shadow-inner overflow-hidden relative flex-shrink-0", className)}>
+        <img src="ETHERMONY.jpeg" alt="Logo" className="w-full h-full object-cover relative z-10" onError={(e) => { e.target.style.display = 'none'; e.target.nextElementSibling.style.display = 'block'; }} />
+        <Brain className={cn("text-purple-500 absolute hidden z-0", fallbackSize)} />
       </div>
     );
 
-    // --- GEOMETRIC BACKGROUND SHAPES (Hero Only) ---
-    function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-white/[0.08]" }) {
+    function ElegantShape({ className, delay = 0, width = 400, height = 100, rotate = 0, gradient = "from-purple-500/[0.08]" }) {
       return (
-        <motion.div
-          initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
-          animate={{ opacity: 1, y: 0, rotate: rotate }}
-          transition={{ duration: 2.4, delay, ease: [0.23, 0.86, 0.39, 0.96], opacity: { duration: 1.2 } }}
-          className={cn("absolute", className)}
-        >
+        <motion.div initial={{ opacity: 0, y: -150, rotate: rotate - 15 }} animate={{ opacity: 1, y: 0, rotate: rotate }} transition={{ duration: 2.4, delay, ease: [0.23, 0.86, 0.39, 0.96], opacity: { duration: 1.2 } }} className={cn("absolute", className)}>
           <motion.div animate={{ y: [0, 15, 0] }} transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }} style={{ width, height }} className="relative">
-            <div className={cn("absolute inset-0 rounded-full bg-gradient-to-r to-transparent", gradient, "backdrop-blur-[2px] border-2 border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] after:absolute after:inset-0 after:rounded-full after:bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]")} />
+            <div className={cn("absolute inset-0 rounded-full bg-gradient-to-r to-transparent", gradient, "backdrop-blur-[2px] border-2 border-gray-200 dark:border-white/[0.15] shadow-[0_8px_32px_0_rgba(255,255,255,0.1)] after:absolute after:inset-0 after:rounded-full after:bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.2),transparent_70%)]")} />
           </motion.div>
         </motion.div>
       );
     }
 
-    // --- FULL SCREEN HERO SCENE ---
+    // --- RE-ADDED MISSING SPLINESCENEBASIC COMPONENT ---
     const SplineSceneBasic = () => {
       const phrases = ["A Unified Study Ecosystem", "Your AI Learning Hub", "Zero Tabs, Infinite Focus", "Eliminate Fragmentation"];
       const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
@@ -166,26 +211,25 @@
         <div className="w-full h-screen relative overflow-hidden flex flex-col">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/[0.05] via-transparent to-rose-500/[0.05] blur-3xl pointer-events-none" />
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <ElegantShape delay={0.3} width={600} height={140} rotate={12} gradient="from-indigo-500/[0.15]" className="left-[-10%] md:left-[-5%] top-[15%] md:top-[20%]" />
-            <ElegantShape delay={0.5} width={500} height={120} rotate={-15} gradient="from-rose-500/[0.15]" className="right-[-5%] md:right-[0%] top-[70%] md:top-[75%]" />
-            <ElegantShape delay={0.4} width={300} height={80} rotate={-8} gradient="from-violet-500/[0.15]" className="left-[5%] md:left-[10%] bottom-[5%] md:bottom-[10%]" />
+            <ElegantShape delay={0.3} width={600} height={140} rotate={12} gradient="from-indigo-500/[0.15] dark:from-indigo-500/[0.15]" className="left-[-10%] md:left-[-5%] top-[15%] md:top-[20%]" />
+            <ElegantShape delay={0.5} width={500} height={120} rotate={-15} gradient="from-rose-500/[0.15] dark:from-rose-500/[0.15]" className="right-[-5%] md:right-[0%] top-[70%] md:top-[75%]" />
+            <ElegantShape delay={0.4} width={300} height={80} rotate={-8} gradient="from-violet-500/[0.15] dark:from-violet-500/[0.15]" className="left-[5%] md:left-[10%] bottom-[5%] md:bottom-[10%]" />
           </div>
 
           <div className="absolute inset-0 w-full h-full z-0 pointer-events-auto md:translate-x-[15%] lg:translate-x-[20%] transition-transform duration-700">
             <spline-viewer url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode" class="w-full h-full spline-watermark-clip"></spline-viewer>
           </div>
-          
-          <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-transparent to-[#030712]/80 pointer-events-none z-0" />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-50 via-transparent to-gray-50/80 dark:from-[#030712] dark:via-transparent dark:to-[#030712]/80 pointer-events-none z-0" />
 
           <div className="relative z-10 w-full h-full flex flex-col justify-center px-8 md:px-16 lg:px-24 max-w-3xl pointer-events-none pt-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 text-xs font-medium text-neutral-300 w-fit mb-6 animate-fade-in-up pointer-events-auto backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-primary" /> AI-Powered Study Engine
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-black/40 border border-gray-200 dark:border-white/10 text-xs font-medium text-gray-600 dark:text-neutral-300 w-fit mb-6 animate-fade-in-up pointer-events-auto backdrop-blur-md shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-primary" /> AI-Powered Study Engine
             </div>
             <h3 className="text-4xl md:text-5xl lg:text-7xl font-bold leading-tight animate-fade-in-up min-h-[100px] md:min-h-[120px] lg:min-h-[160px]" style={{ animationDelay: "0.1s" }}>
-              <span className="bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400">{currentText}</span>
-              <span className="inline-block w-[3px] h-[0.9em] bg-primary ml-2 animate-pulse align-middle"></span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-b from-gray-900 to-gray-500 dark:from-neutral-50 dark:to-neutral-400">{currentText}</span>
+              <span className="inline-block w-[3px] h-[0.9em] bg-purple-600 dark:bg-primary ml-2 animate-pulse align-middle"></span>
             </h3>
-            <p className="mt-4 md:mt-6 text-neutral-400 max-w-md text-base md:text-lg leading-relaxed animate-fade-in-up drop-shadow-md" style={{ animationDelay: "0.2s" }}>
+            <p className="mt-4 md:mt-6 text-gray-600 dark:text-neutral-400 max-w-md text-base md:text-lg leading-relaxed animate-fade-in-up drop-shadow-md" style={{ animationDelay: "0.2s" }}>
               Transform scattered learning into a guided, immersive experience. Get structured AI explanations, instant video resources, and focused summaries—all in one calm space.
             </p>
           </div>
@@ -193,112 +237,187 @@
       );
     };
 
-    // --- NEW: AUTHENTICATION PAGE WITH PHONE LOGIN SEPARATION ---
-    const AuthPage = ({ onBack, onLoginSuccess, initialMode }) => {
-      // isLogin: True = Login, False = Sign Up
+    // --- RE-ADDED MISSING AUTHPAGE COMPONENT ---
+    const AuthPage = ({ onBack, initialMode }) => {
       const [isLogin, setIsLogin] = useState(initialMode === 'login');
-      // authMethod: 'email' or 'phone'
-      const [authMethod, setAuthMethod] = useState('email');
+      const [authMethod, setAuthMethod] = useState('email'); 
+      const [isLoading, setIsLoading] = useState(false);
+      const [errorMsg, setErrorMsg] = useState('');
+      
+      const [name, setName] = useState('');
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      
+      const [phone, setPhone] = useState('');
+      const [otp, setOtp] = useState('');
+      const [showOtpInput, setShowOtpInput] = useState(false);
+      const [confirmationResult, setConfirmationResult] = useState(null);
+
+      useEffect(() => {
+        const recaptchaContainer = document.getElementById('recaptcha-container');
+        if (recaptchaContainer && !window.recaptchaVerifier) {
+          window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': (response) => {}
+          });
+        }
+      }, []);
+
+      const handleEmailAuth = async (e) => {
+        e.preventDefault();
+        setIsLoading(true); setErrorMsg('');
+        try {
+          if (isLogin) {
+            await signInWithEmailAndPassword(auth, email, password);
+          } else {
+            const userCred = await createUserWithEmailAndPassword(auth, email, password);
+            await updateProfile(userCred.user, { displayName: name });
+          }
+        } catch (error) {
+          let cleanMsg = error.message.replace('Firebase: ', '');
+          if (error.code === 'auth/email-already-in-use') cleanMsg = 'This email is already registered.';
+          if (error.code === 'auth/wrong-password') cleanMsg = 'Incorrect password.';
+          if (error.code === 'auth/user-not-found') cleanMsg = 'No account found with this email.';
+          setErrorMsg(cleanMsg);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const handleGoogleAuth = async () => {
+        setIsLoading(true); setErrorMsg('');
+        try {
+          await signInWithPopup(auth, googleProvider);
+        } catch (error) {
+          setErrorMsg(error.message.replace('Firebase: ', '') + " (Ensure domain is whitelisted in Firebase Auth Settings)");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const sendOTP = async (e) => {
+        e.preventDefault();
+        setIsLoading(true); setErrorMsg('');
+        try {
+          const appVerifier = window.recaptchaVerifier;
+          const result = await signInWithPhoneNumber(auth, phone, appVerifier);
+          setConfirmationResult(result);
+          setShowOtpInput(true);
+        } catch (error) {
+          setErrorMsg(error.message.replace('Firebase: ', '') + " (Ensure domain is whitelisted in Firebase Auth Settings)");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const verifyOTP = async (e) => {
+        e.preventDefault();
+        setIsLoading(true); setErrorMsg('');
+        try {
+          await confirmationResult.confirm(otp);
+        } catch (error) {
+          setErrorMsg("Invalid or expired code. Please try again.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
 
       return (
-        <div className="w-full h-screen absolute inset-0 z-[100] flex items-center justify-center p-6 bg-[#030712] overflow-hidden animate-fade-in">
-          
-          {/* Subtle static radial glow */}
-          <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[radial-gradient(ellipse_at_center,_#4a154b_0%,_#2d0f41_40%,_transparent_70%)] opacity-80 pointer-events-none"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-[radial-gradient(ellipse_at_center,_#1c103f_0%,_transparent_70%)] opacity-60 pointer-events-none"></div>
+        <div className="w-full h-screen absolute inset-0 z-[100] flex items-center justify-center p-6 bg-gray-50 dark:bg-[#030712] overflow-hidden animate-fade-in transition-colors">
+          <div className="absolute top-[-20%] right-[-10%] w-[70%] h-[70%] bg-[radial-gradient(ellipse_at_center,_#4a154b_0%,_transparent_70%)] opacity-30 dark:opacity-80 pointer-events-none"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-[radial-gradient(ellipse_at_center,_#1c103f_0%,_transparent_70%)] opacity-30 dark:opacity-60 pointer-events-none"></div>
 
-          {/* Back Button */}
-          <button onClick={onBack} className="absolute top-8 left-8 flex items-center gap-2 text-white/80 hover:text-white transition-colors bg-white/5 hover:bg-white/10 px-4 py-2 rounded-full backdrop-blur-md border border-white/10 z-20">
+          <button onClick={onBack} className="absolute top-8 left-8 flex items-center gap-2 text-gray-600 dark:text-white/80 hover:text-gray-900 dark:hover:text-white transition-colors bg-white dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 px-4 py-2 rounded-full shadow-sm dark:shadow-none border border-gray-200 dark:border-white/10 z-20">
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
 
-          {/* Glassmorphism Auth Card */}
-          <div className="w-full max-w-md bg-[#0a0514]/60 backdrop-blur-2xl border border-white/10 p-8 md:p-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10">
-            
+          <div className="w-full max-w-md bg-white dark:bg-[#0a0514]/60 backdrop-blur-2xl border border-gray-200 dark:border-white/10 p-8 md:p-10 rounded-3xl shadow-2xl dark:shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10 transition-colors">
             <div className="text-center mb-8">
               <EthermonyLogo className="w-14 h-14 rounded-2xl mx-auto mb-4 border-purple-500/30" fallbackSize="w-8 h-8" />
-              <h2 className="text-3xl font-bold text-white tracking-tight">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
-              <p className="text-white/60 text-sm mt-2">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
+              <p className="text-gray-500 dark:text-white/60 text-sm mt-2">
                 {isLogin ? 'Log in to your unified study space' : 'Join ETHERMONY and master your focus'}
               </p>
             </div>
 
-            {/* FLOW 1: EMAIL / PASSWORD */}
+            {errorMsg && (
+              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-xl mb-4 text-center shadow-sm">
+                {errorMsg}
+              </div>
+            )}
+
             {authMethod === 'email' && (
-              <form className="space-y-4 animate-fade-in" onSubmit={(e) => { e.preventDefault(); onLoginSuccess(); }}>
-                
+              <form className="space-y-4 animate-fade-in" onSubmit={handleEmailAuth}>
                 {!isLogin && (
                   <div className="relative group">
-                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                    <input type="text" placeholder="Full Name" required className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-all" />
+                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                    <input type="text" placeholder="Full Name" required value={name} onChange={(e)=>setName(e.target.value)} className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all" />
                   </div>
                 )}
-
                 <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                  <input type="email" placeholder="Email Address" required className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-all" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                  <input type="email" placeholder="Email Address" required value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all" />
+                </div>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                  <input type="password" placeholder="Password" required value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all" />
                 </div>
 
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                  <input type="password" placeholder="Password" required className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-all" />
-                </div>
-
-                {isLogin && (
-                  <div className="flex justify-end pt-1">
-                    <a href="#" className="text-xs text-white/60 hover:text-white transition-colors">Forgot password?</a>
-                  </div>
-                )}
-
-                <button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl py-3.5 mt-4 transition-all shadow-[0_0_20px_rgba(168,85,247,0.3)] active:scale-[0.98]">
-                  {isLogin ? 'Log In' : 'Sign Up'}
+                <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold rounded-xl py-3.5 mt-4 transition-all shadow-md hover:shadow-lg active:scale-[0.98] disabled:opacity-50">
+                  {isLoading ? 'Processing...' : (isLogin ? 'Log In' : 'Sign Up')}
                 </button>
 
                 <div className="relative flex items-center py-2">
-                  <div className="flex-grow border-t border-white/10"></div>
-                  <span className="flex-shrink-0 mx-4 text-white/40 text-xs uppercase tracking-wider">or</span>
-                  <div className="flex-grow border-t border-white/10"></div>
+                  <div className="flex-grow border-t border-gray-200 dark:border-white/10"></div>
+                  <span className="flex-shrink-0 mx-4 text-gray-400 text-xs uppercase tracking-wider font-semibold">or</span>
+                  <div className="flex-grow border-t border-gray-200 dark:border-white/10"></div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                  <button type="button" onClick={onLoginSuccess} className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl py-3 px-4 font-medium flex items-center justify-center gap-3 transition-colors active:scale-[0.98]">
-                    <GoogleIcon className="w-5 h-5" />
-                    Continue with Google
+                  <button type="button" onClick={handleGoogleAuth} disabled={isLoading} className="w-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white rounded-xl py-3 px-4 font-bold flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50">
+                    <GoogleIcon className="w-5 h-5" /> Continue with Google
                   </button>
-                  <button type="button" onClick={() => setAuthMethod('phone')} className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl py-3 px-4 font-medium flex items-center justify-center gap-3 transition-colors active:scale-[0.98]">
-                    <PhoneIcon className="w-5 h-5 text-gray-300" />
-                    Continue with Phone
+                  <button type="button" onClick={() => {setAuthMethod('phone'); setErrorMsg('');}} disabled={isLoading} className="w-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-white rounded-xl py-3 px-4 font-bold flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.98] disabled:opacity-50">
+                    <PhoneIcon className="w-5 h-5 text-gray-500 dark:text-gray-300" /> Continue with Phone
                   </button>
                 </div>
               </form>
             )}
 
-            {/* FLOW 2: PHONE OTP */}
             {authMethod === 'phone' && (
-              <form className="space-y-4 animate-fade-in" onSubmit={(e) => { e.preventDefault(); onLoginSuccess(); }}>
-                <p className="text-sm text-gray-400 text-center mb-4">We'll send a code to verify your number.</p>
-                <div className="relative group">
-                  <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40 group-focus-within:text-white transition-colors" />
-                  <input type="tel" placeholder="+1 (555) 000-0000" required className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 transition-all font-mono" />
-                </div>
+              <form className="space-y-4 animate-fade-in" onSubmit={showOtpInput ? verifyOTP : sendOTP}>
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center mb-4">
+                  {showOtpInput ? "Enter the 6-digit code sent to your phone." : "We'll send a code to verify your number."}
+                </p>
                 
-                <button type="submit" className="w-full bg-white text-black font-semibold rounded-xl py-3.5 mt-4 hover:bg-gray-200 transition-colors shadow-lg active:scale-[0.98]">
-                  Send Verification Code
+                {!showOtpInput ? (
+                  <div className="relative group">
+                    <PhoneIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                    <input type="tel" placeholder="+15551234567" required value={phone} onChange={(e)=>setPhone(e.target.value)} className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-mono" />
+                  </div>
+                ) : (
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-500 transition-colors" />
+                    <input type="text" placeholder="123456" required value={otp} onChange={(e)=>setOtp(e.target.value)} className="w-full bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl py-3 pl-12 pr-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-mono tracking-widest text-center text-lg" />
+                  </div>
+                )}
+                
+                <button type="submit" disabled={isLoading} className="w-full bg-gray-900 dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black font-bold rounded-xl py-3.5 mt-4 transition-all shadow-md active:scale-[0.98] disabled:opacity-50">
+                  {isLoading ? 'Processing...' : (showOtpInput ? 'Verify Code' : 'Send Verification Code')}
                 </button>
 
                 <div className="mt-4 text-center">
-                  <button type="button" onClick={() => setAuthMethod('email')} className="text-sm text-purple-400 hover:text-purple-300 transition-colors font-medium">
+                  <button type="button" onClick={() => {setAuthMethod('email'); setShowOtpInput(false); setConfirmationResult(null);}} className="text-sm font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
                     ← Back to Email
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Toggle Login/Signup (Only visible on Email flow to avoid confusion during OTP) */}
             {authMethod === 'email' && (
-              <p className="text-center mt-8 text-sm text-white/60">
+              <p className="text-center mt-8 text-sm text-gray-500 dark:text-white/60">
                 {isLogin ? "Don't have an account? " : "Already have an account? "}
-                <button onClick={() => setIsLogin(!isLogin)} className="text-purple-400 font-semibold hover:text-purple-300 transition-colors">
+                <button onClick={() => {setIsLogin(!isLogin); setErrorMsg('');}} className="text-purple-600 dark:text-purple-400 font-bold hover:text-purple-700 dark:hover:text-purple-300 transition-colors">
                   {isLogin ? 'Sign up' : 'Log in'}
                 </button>
               </p>
@@ -308,353 +427,803 @@
       );
     }
 
-    // --- WORKSPACE COMPONENTS ---
+    // --- HARMONY POINTS SYSTEM ---
+    const addHarmonyPoints = async (uid, amount, showToast) => {
+      try {
+        const userRef = doc(db, 'artifacts', safeAppId, 'users', uid);
+        await setDoc(userRef, { points: increment(amount) }, { merge: true });
+        if(showToast) showToast(`+${amount} Harmony Points!`, 'success');
+      } catch (e) {
+        console.warn("Points system functioning locally.");
+      }
+    };
 
-    const StudyChatFeature = () => {
-      const [prompt, setPrompt] = useState("");
-      const [isLoading, setIsLoading] = useState(false);
-      const [hasResult, setHasResult] = useState(false);
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!prompt.trim()) return;
-        setIsLoading(true);
-        setHasResult(false);
-        setTimeout(() => {
-          setIsLoading(false);
-          setHasResult(true);
-        }, 2500);
+    // --- THE ULTIMATE DUAL-ENGINE AI HELPER ---
+    const generateAIContent = async (systemPrompt, userPrompt, isJson = false) => {
+      const parseAIResult = (text) => {
+        if (!isJson) return text;
+        let clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const start = clean.indexOf('{');
+        const end = clean.lastIndexOf('}');
+        if (start !== -1 && end !== -1) clean = clean.substring(start, end + 1);
+        return JSON.parse(clean);
       };
 
+      let finalPrompt = `${systemPrompt}\n\nUser Request: ${userPrompt}`;
+      if (isJson) finalPrompt += "\n\nCRITICAL: Output ONLY raw JSON matching the schema requested. No markdown, no conversational text.";
+
+      try {
+        if (typeof puter !== 'undefined') {
+          const response = await puter.ai.chat(finalPrompt);
+          let textResult = typeof response === 'string' ? response : (response.message?.content || response.text || String(response));
+          if (textResult) return parseAIResult(textResult);
+        }
+      } catch (error) {
+        console.warn("Puter AI unavailable, switching to Fallback API.", error);
+      }
+
+      try {
+        const fallbackRes = await fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: finalPrompt }
+            ],
+            jsonMode: isJson 
+          })
+        });
+
+        if (!fallbackRes.ok) throw new Error("Fallback failed");
+        const fallbackText = await fallbackRes.text();
+        return parseAIResult(fallbackText);
+
+      } catch (err) {
+        console.error("All AI Engines Failed:", err);
+        throw new Error("Unable to connect to AI providers. Please check your connection.");
+      }
+    };
+
+    // --- COMPONENTS ---
+    const ThemeToggle = ({ isDark, setIsDark }) => (
+      <button 
+        onClick={() => setIsDark(!isDark)} 
+        className="w-10 h-10 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center text-gray-700 dark:text-yellow-400 hover:bg-black/10 dark:hover:bg-white/20 transition-colors border border-black/10 dark:border-white/20"
+      >
+        {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </button>
+    );
+
+    const PomodoroTimer = ({ user, showToast }) => {
+      const [timeLeft, setTimeLeft] = useState(25 * 60);
+      const [isActive, setIsActive] = useState(false);
+      const [isWork, setIsWork] = useState(true);
+
+      useEffect(() => {
+        let interval = null;
+        if (isActive && timeLeft > 0) {
+          interval = setInterval(() => setTimeLeft(timeLeft - 1), 1000);
+        } else if (isActive && timeLeft === 0) {
+          setIsActive(false);
+          if (isWork) {
+            if (user) addHarmonyPoints(user.uid, 20, showToast);
+            setIsWork(false);
+            setTimeLeft(5 * 60); 
+            if(showToast) showToast("Focus complete! Time for a break.", 'success');
+          } else {
+            setIsWork(true);
+            setTimeLeft(25 * 60);
+            if(showToast) showToast("Break over! Ready to focus?", 'info');
+          }
+        }
+        return () => clearInterval(interval);
+      }, [isActive, timeLeft, isWork, user]);
+
+      const toggleTimer = () => setIsActive(!isActive);
+      const resetTimer = () => { setIsActive(false); setTimeLeft(isWork ? 25 * 60 : 5 * 60); };
+
+      const mins = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+      const secs = (timeLeft % 60).toString().padStart(2, '0');
+
       return (
-        <div className="flex flex-col h-full max-w-5xl mx-auto animate-fade-in-up">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Study & Research Engine</h2>
-            <p className="text-gray-400 text-sm">Ask a question. ETHERMONY will generate an explanation, fetch video resources, and create a custom quiz.</p>
-          </div>
+        <div className="flex items-center gap-3 bg-white dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-xl p-2 px-4 shadow-sm">
+          <ClockIcon className={`w-5 h-5 ${isWork ? 'text-purple-500' : 'text-green-500'}`} />
+          <span className="font-mono font-bold text-gray-800 dark:text-white text-lg w-16 text-center">{mins}:{secs}</span>
+          <button onClick={toggleTimer} className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${isActive ? 'bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30' : 'bg-purple-500/20 text-purple-700 dark:text-purple-300 hover:bg-purple-500/30'}`}>
+            {isActive ? 'PAUSE' : 'START'}
+          </button>
+          <button onClick={resetTimer} className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1"><XCircle className="w-4 h-4"/></button>
+        </div>
+      );
+    };
 
-          <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-2 mb-8 shadow-lg focus-within:border-purple-500/50 transition-colors">
-            <form onSubmit={handleSubmit} className="flex items-center relative">
-              <div className="p-2">
-                <EthermonyLogo className="w-8 h-8 rounded-lg" fallbackSize="w-5 h-5" />
-              </div>
-              <input 
-                type="text" 
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="E.g., Explain the theory of relativity simply..." 
-                className="flex-grow bg-transparent border-none text-white placeholder-gray-500 focus:outline-none py-3 px-2"
-              />
-              <button disabled={isLoading} type="submit" className="bg-purple-600 hover:bg-purple-500 text-white p-3 rounded-xl transition-colors disabled:opacity-50">
-                {isLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
-              </button>
-            </form>
-          </div>
-
-          <div className="flex-grow overflow-y-auto pr-2 pb-10 space-y-10">
-            {!hasResult && !isLoading && (
-              <div className="h-full flex flex-col items-center justify-center text-center opacity-50 pt-20">
-                <Sparkles className="w-12 h-12 text-gray-400 mb-4" />
-                <p className="text-gray-400">Your generated study materials will appear here.</p>
-              </div>
-            )}
-
-            {isLoading && (
-              <div className="space-y-8 animate-pulse">
-                <div className="h-40 bg-white/5 rounded-2xl border border-white/5"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="h-24 bg-white/5 rounded-2xl"></div><div className="h-24 bg-white/5 rounded-2xl"></div></div>
-                <div className="h-64 bg-white/5 rounded-2xl"></div>
-              </div>
-            )}
-
-            {hasResult && !isLoading && (
-              <div className="space-y-8 animate-fade-in-up">
-                
-                {/* AI Explanation */}
-                <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-3">
-                    <EthermonyLogo className="w-6 h-6 rounded-md" fallbackSize="w-4 h-4" /> Core Explanation
-                  </h3>
-                  <div className="text-gray-300 text-sm leading-relaxed space-y-4">
-                    <p><strong>Relativity</strong> is basically the idea that the laws of physics are the same for everyone, regardless of how fast they are moving, as long as they aren't accelerating. It was formulated by Albert Einstein.</p>
-                    <p>There are two parts: <em>Special Relativity</em> (which deals with speed and time dilation) and <em>General Relativity</em> (which explains gravity as the warping of space and time).</p>
-                    <ul className="list-disc pl-5 space-y-1 text-gray-400">
-                      <li><strong>E=mc²:</strong> Energy equals mass times the speed of light squared.</li>
-                      <li><strong>Time Dilation:</strong> Time moves slower the faster you go.</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* YouTube Resources */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <PlayCircle className="w-5 h-5 text-red-400" /> Curated Video Lectures
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[1, 2, 3].map((i) => (
-                      <div key={i} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden group cursor-pointer hover:border-purple-500/50 transition-all">
-                        <div className="h-32 bg-gray-800 relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-purple-900 opacity-60"></div>
-                          <PlayCircle className="w-10 h-10 text-white absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-80 group-hover:scale-110 transition-transform" />
-                          <span className="absolute bottom-2 right-2 bg-black/80 text-xs px-1.5 py-0.5 rounded text-white font-mono">12:4{i}</span>
-                        </div>
-                        <div className="p-4">
-                          <h4 className="text-sm font-semibold text-white line-clamp-2 mb-1">Theory of Relativity EXPLAINED in {i * 5} Minutes</h4>
-                          <p className="text-xs text-gray-500">Science Channel • {i}M views</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quizzes */}
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FileQuestion className="w-5 h-5 text-blue-400" /> Knowledge Check (Easy to Hard)
-                  </h3>
-                  <div className="space-y-3">
-                    {[
-                      { q: "What does the 'c' in E=mc² stand for?", diff: "Easy", color: "text-green-400 bg-green-400/10" },
-                      { q: "Who developed the theory of relativity?", diff: "Easy", color: "text-green-400 bg-green-400/10" },
-                      { q: "Which part of relativity deals with gravity?", diff: "Medium", color: "text-yellow-400 bg-yellow-400/10" },
-                      { q: "Explain the concept of time dilation.", diff: "Medium", color: "text-yellow-400 bg-yellow-400/10" },
-                      { q: "How does mass affect spacetime according to General Relativity?", diff: "Hard", color: "text-red-400 bg-red-400/10" }
-                    ].map((quiz, i) => (
-                      <div key={i} className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex items-start gap-4 hover:bg-white/[0.04] transition-colors cursor-pointer group">
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-gray-400 group-hover:text-white transition-colors">
-                          {i + 1}
-                        </div>
-                        <div className="flex-grow">
-                          <p className="text-sm text-gray-300 group-hover:text-white transition-colors">{quiz.q}</p>
-                        </div>
-                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded border border-white/5 ${quiz.color}`}>
-                          {quiz.diff}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="text-center py-2 text-sm text-purple-400 cursor-pointer hover:underline">
-                      + View 5 more advanced questions
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            )}
+    const Toast = ({ message, type = 'info' }) => {
+      if (!message) return null;
+      return (
+        <div className="fixed bottom-6 right-6 z-[9999] animate-fade-in-up">
+          <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${type === 'success' ? 'bg-green-50 dark:bg-green-900/40 border-green-200 dark:border-green-500/30 text-green-800 dark:text-green-300' : 'bg-purple-50 dark:bg-purple-900/40 border-purple-200 dark:border-purple-500/30 text-purple-800 dark:text-purple-300'}`}>
+            {type === 'success' ? <CheckCircle className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
+            <span className="font-medium">{message}</span>
           </div>
         </div>
       );
     };
 
-    const StudyRoomsFeature = () => {
-      const messages = [
-        { sender: 'Alex', text: 'Does anyone understand how the Krebs cycle actually works?', time: '10:02 AM', isMe: false },
-        { sender: 'ETHERMONY AI', isBot: true, text: 'The Krebs cycle (or Citric Acid Cycle) is a series of chemical reactions used by all aerobic organisms to release stored energy. It takes place in the mitochondria. Would you like me to break down the 8 steps?', time: '10:02 AM' },
-        { sender: 'Sarah', text: 'Yes please! Im struggling with the enzymes involved.', time: '10:04 AM', isMe: false },
-        { sender: 'You', text: 'Specifically Step 3, the isocitrate part.', time: '10:05 AM', isMe: true },
-      ];
+    // --- LEADERBOARD TAB ---
+    const LeaderboardFeature = () => {
+      const [leaders, setLeaders] = useState([]);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        const q = query(collection(db, 'artifacts', safeAppId, 'users'), orderBy('points', 'desc'), limit(10));
+        const unsub = onSnapshot(q, (snap) => {
+          setLeaders(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+          setLoading(false);
+        }, () => setLoading(false)); 
+        return () => unsub();
+      }, []);
 
       return (
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-120px)] gap-6 animate-fade-in-up">
-          <div className="flex-grow flex flex-col bg-white/[0.02] border border-white/10 rounded-2xl overflow-hidden">
-            <div className="h-16 border-b border-white/10 flex items-center justify-between px-6 bg-white/[0.01]">
-              <div>
-                <h3 className="font-bold text-white flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500"></div> Advanced Biology 101
-                </h3>
-                <p className="text-xs text-gray-400 font-mono tracking-wider">Room ID: BIO-X79K <span className="text-purple-400 cursor-pointer hover:underline">(Copy to invite)</span></p>
-              </div>
-              <div className="flex -space-x-2">
-                {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 border-2 border-[#030712]"></div>)}
-              </div>
+        <div className="max-w-4xl mx-auto h-full flex flex-col animate-fade-in-up">
+          <div className="mb-8 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 mx-auto flex items-center justify-center mb-4">
+              <Trophy className="w-8 h-8 text-yellow-500" />
             </div>
-
-            <div className="flex-grow overflow-y-auto p-6 space-y-6">
-              {messages.map((msg, i) => (
-                <div key={i} className={`flex flex-col max-w-[80%] ${msg.isMe ? 'ml-auto items-end' : 'items-start'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs font-medium flex items-center gap-1 ${msg.isBot ? 'text-primary' : 'text-gray-400'}`}>
-                      {msg.isBot && <EthermonyLogo className="w-4 h-4 rounded-sm" fallbackSize="w-3 h-3" />} {msg.sender}
-                    </span>
-                    <span className="text-[10px] text-gray-600">{msg.time}</span>
-                  </div>
-                  <div className={`p-3 rounded-2xl text-sm leading-relaxed ${
-                    msg.isMe 
-                      ? 'bg-purple-600 text-white rounded-tr-none' 
-                      : msg.isBot 
-                        ? 'bg-primary/10 border border-primary/20 text-gray-200 rounded-tl-none shadow-[0_0_15px_rgba(139,92,246,0.1)]'
-                        : 'bg-white/5 text-gray-300 border border-white/10 rounded-tl-none'
-                  }`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-4 border-t border-white/10 bg-white/[0.01]">
-              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl p-2 pr-2 focus-within:border-purple-500/50 transition-colors">
-                <button className="p-2 text-purple-400 hover:text-purple-300 transition-colors" title="Trigger ETHERMONY AI">
-                  <Sparkles className="w-5 h-5" />
-                </button>
-                <input type="text" placeholder="Message group or ask AI (@ai)..." className="flex-grow bg-transparent border-none text-sm text-white focus:outline-none" />
-                <button className="bg-white text-black p-2 rounded-lg hover:bg-gray-200 transition-colors">
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Global Leaderboard</h2>
+            <p className="text-gray-500 dark:text-gray-400">Earn Harmony Points by studying, completing quizzes, and collaborating.</p>
           </div>
 
-          <div className="w-full lg:w-72 flex flex-col gap-6">
-            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5">
-              <h4 className="text-sm font-bold text-white mb-4">Room Resources</h4>
+          <div className="flex-grow bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-3xl overflow-hidden shadow-xl p-2 md:p-6">
+            {loading ? (
+              <div className="flex justify-center items-center h-40"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>
+            ) : leaders.length === 0 ? (
+              <div className="text-center text-gray-500 py-10">No scores yet. Start studying to rank up!</div>
+            ) : (
               <div className="space-y-3">
-                <div className="p-3 bg-white/5 rounded-xl text-xs text-gray-300 flex items-center gap-3 cursor-pointer hover:bg-white/10"><FileQuestion className="w-4 h-4 text-purple-400"/> Shared Notes Doc</div>
-                <div className="p-3 bg-white/5 rounded-xl text-xs text-gray-300 flex items-center gap-3 cursor-pointer hover:bg-white/10"><PlayCircle className="w-4 h-4 text-blue-400"/> Lecture Recording</div>
-              </div>
-            </div>
-            
-            <div className="bg-white/[0.02] border border-white/10 rounded-2xl p-5 flex-grow">
-              <h4 className="text-sm font-bold text-white mb-4">Active Members (3)</h4>
-              <div className="space-y-4">
-                {['Alex', 'Sarah', 'You'].map((name, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400">{name[0]}</div>
-                    <span className="text-sm text-gray-300">{name}</span>
-                    <div className="ml-auto w-2 h-2 rounded-full bg-green-500"></div>
+                {leaders.map((user, idx) => (
+                  <div key={user.uid} className={`flex items-center p-4 rounded-2xl transition-all hover:bg-gray-50 dark:hover:bg-white/5 border border-transparent hover:border-gray-200 dark:hover:border-white/10 ${idx === 0 ? 'bg-yellow-50 dark:bg-yellow-500/10 border-yellow-200 dark:border-yellow-500/20 shadow-sm' : ''}`}>
+                    <div className={`w-8 font-bold text-lg text-center ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : idx === 2 ? 'text-amber-700 dark:text-orange-400' : 'text-gray-300 dark:text-gray-600'}`}>
+                      #{idx + 1}
+                    </div>
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 dark:bg-white/10 ml-4 mr-4 flex-shrink-0">
+                      {user.photoURL ? <img src={user.photoURL} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-500 font-bold">{user.name?.charAt(0) || '?'}</div>}
+                    </div>
+                    <div className="flex-grow">
+                      <h4 className="font-bold text-gray-900 dark:text-white">{user.name || "Anonymous Student"}</h4>
+                    </div>
+                    <div className="flex items-center gap-2 bg-purple-100 dark:bg-purple-500/20 px-4 py-2 rounded-xl">
+                      <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span className="font-mono font-bold text-purple-700 dark:text-purple-300">{user.points || 0}</span>
+                    </div>
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- QUIZ COMPONENT ---
+    const QuizInteractive = ({ quizzes, user, showToast }) => {
+      const [answers, setAnswers] = useState({});
+      
+      const handleSelect = (quizIdx, optionIdx) => {
+        if(answers[quizIdx] !== undefined) return; 
+        setAnswers({...answers, [quizIdx]: optionIdx});
+        if (optionIdx === quizzes[quizIdx].correctAnswerIndex && user) {
+          addHarmonyPoints(user.uid, 5, showToast);
+        }
+      };
+
+      if (!quizzes || quizzes.length === 0) return null;
+
+      return (
+        <div className="space-y-6">
+          {quizzes.map((quiz, i) => {
+            const answered = answers[i] !== undefined;
+            const isCorrect = answered && answers[i] === quiz.correctAnswerIndex;
+            const diffClass = quiz.difficulty === 'Easy' ? 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-400/10' : 
+                              quiz.difficulty === 'Hard' ? 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-400/10' : 
+                              'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-400/10';
+
+            return (
+              <div key={i} className="bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-2xl p-5 shadow-sm transition-colors hover:border-purple-300 dark:hover:border-white/10">
+                <div className="flex justify-between items-start mb-4 gap-4">
+                  <p className="text-gray-900 dark:text-white font-medium leading-relaxed"><span className="text-purple-500 mr-2 font-bold">Q{i+1}.</span>{quiz.question}</p>
+                  <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-lg border border-transparent dark:border-white/5 whitespace-nowrap ${diffClass}`}>
+                    {quiz.difficulty || "Medium"}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  {quiz.options && quiz.options.map((opt, optIdx) => {
+                    let btnClass = "bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 dark:text-gray-300";
+                    if (answered) {
+                      if (optIdx === quiz.correctAnswerIndex) btnClass = "bg-green-100 border-green-500 text-green-800 dark:bg-green-500/20 dark:border-green-500/50 dark:text-green-300 shadow-md";
+                      else if (optIdx === answers[i]) btnClass = "bg-red-100 border-red-500 text-red-800 dark:bg-red-500/20 dark:border-red-500/50 dark:text-red-300";
+                      else btnClass = "opacity-50 border-transparent";
+                    }
+                    return (
+                      <button key={optIdx} onClick={() => handleSelect(i, optIdx)} disabled={answered} className={`p-4 rounded-xl text-left text-sm font-medium transition-all ${btnClass}`}>
+                        {opt}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {answered && (
+                  <div className={`p-4 rounded-xl text-sm flex items-start gap-3 animate-fade-in ${isCorrect ? 'bg-green-50 text-green-800 dark:bg-green-500/10 dark:text-green-200 border border-green-100 dark:border-transparent' : 'bg-red-50 text-red-800 dark:bg-red-500/10 dark:text-red-200 border border-red-100 dark:border-transparent'}`}>
+                    {isCorrect ? <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" /> : <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />}
+                    <span><strong className="block mb-1">Explanation:</strong> {quiz.explanation}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // --- FEATURE 1: MULTIPLE AI STUDY CHATS ---
+    const StudyChatFeature = ({ user, showToast }) => {
+      const [sessions, setSessions] = useState([]); 
+      const [activeSessionId, setActiveSessionId] = useState(null);
+      
+      const [prompt, setPrompt] = useState("");
+      const [isLoading, setIsLoading] = useState(false);
+      const [error, setError] = useState(null);
+
+      const activeSession = sessions.find(s => s.id === activeSessionId);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!prompt.trim() || isLoading) return;
+        setIsLoading(true); setError(null);
+
+        try {
+          const systemPrompt = "You are a brilliant academic tutor. Provide an explanation of the topic. Generate up to 5 quizzes ranging from Easy to Hard. Provide exactly 3 realistic YouTube search terms (as titles).";
+          
+          const jsonSchemaReq = `Output STRICTLY as JSON with this exact format: {"explanation": "HTML formatted text", "videos": [{"title": "Search Term 1"}, {"title": "Search Term 2"}, {"title": "Search Term 3"}], "quizzes": [{"question": "?", "options": ["A","B","C","D"], "correctAnswerIndex": 0, "explanation": "Why", "difficulty": "Easy"}]}`;
+
+          const parsedData = await generateAIContent(systemPrompt, prompt + "\n\n" + jsonSchemaReq, true);
+          
+          const newSession = {
+            id: Date.now().toString(),
+            title: prompt.substring(0, 20) || "Study Module",
+            query: prompt,
+            result: parsedData
+          };
+
+          setSessions([newSession, ...sessions]);
+          setActiveSessionId(newSession.id);
+          setPrompt("");
+          if (user) addHarmonyPoints(user.uid, 10, showToast); 
+        } catch (err) {
+          console.error(err);
+          setError("Failed to generate module. The free AI might be busy, please try again.");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      const startNewChat = () => { setActiveSessionId(null); setPrompt(""); setError(null); };
+
+      return (
+        <div className="flex h-[calc(100vh-120px)] gap-6">
+          <div className="w-64 bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-2xl hidden lg:flex flex-col overflow-hidden shadow-sm dark:shadow-none">
+            <div className="p-4 border-b border-gray-200 dark:border-white/10">
+              <button onClick={startNewChat} className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white rounded-xl py-3 flex items-center justify-center gap-2 text-sm font-semibold transition-colors">
+                <Plus className="w-4 h-4"/> New Study Session
+              </button>
+            </div>
+            <div className="flex-grow overflow-y-auto p-3 space-y-2">
+              {sessions.length === 0 && <div className="text-xs text-center text-gray-400 mt-4">No sessions yet</div>}
+              {sessions.map(s => (
+                <button key={s.id} onClick={() => setActiveSessionId(s.id)} className={`w-full text-left p-3 rounded-xl text-sm font-medium truncate transition-colors ${activeSessionId === s.id ? 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5'}`}>
+                  {s.title}...
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-grow flex flex-col max-w-5xl mx-auto overflow-hidden bg-white dark:bg-white/[0.01] rounded-3xl border border-transparent dark:border-white/5 shadow-xl dark:shadow-none">
+            {!activeSessionId ? (
+              <div className="flex-grow flex flex-col items-center justify-center p-6 animate-fade-in">
+                <div className="w-20 h-20 rounded-3xl bg-purple-100 dark:bg-white/5 border border-purple-200 dark:border-white/10 mb-8 flex items-center justify-center shadow-inner">
+                  <Brain className="w-10 h-10 text-purple-600 dark:text-purple-400" />
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-3">What do you want to learn?</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-10 text-center max-w-lg text-lg">Type any academic topic below to generate a comprehensive AI study module instantly.</p>
+                
+                <form onSubmit={handleSubmit} className="w-full max-w-2xl bg-gray-50 dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-2xl p-2 shadow-lg focus-within:border-purple-500/50 focus-within:ring-4 focus-within:ring-purple-500/10 transition-all">
+                  <div className="flex items-center">
+                    <div className="pl-4 pr-2 text-purple-400"><Sparkles className="w-5 h-5" /></div>
+                    <input type="text" value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="E.g., Explain the Krebs cycle in detail..." className="flex-grow bg-transparent border-none text-gray-900 dark:text-white focus:outline-none py-4 px-2 text-lg" />
+                    <button disabled={isLoading || !prompt.trim()} type="submit" className="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl transition-all disabled:opacity-50 disabled:hover:scale-100 hover:scale-105 active:scale-95 shadow-md">
+                      {isLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Send className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {error && <p className="text-red-500 text-sm px-4 pb-2 pt-2 font-medium text-center">{error}</p>}
+                </form>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full bg-gray-50 dark:bg-transparent">
+                <div className="flex-grow overflow-y-auto p-4 md:p-8 space-y-10 animate-fade-in-up">
+                  
+                  <div className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-5 self-end max-w-2xl ml-auto text-right shadow-sm">
+                    <p className="text-gray-900 dark:text-white text-lg font-medium">{activeSession.query}</p>
+                  </div>
+
+                  <div className="space-y-10">
+                    <div className="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 rounded-3xl p-6 md:p-8 relative overflow-hidden shadow-md">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500"></div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                        <EthermonyLogo className="w-8 h-8 rounded-lg" fallbackSize="w-5 h-5" /> Comprehensive Explanation
+                      </h3>
+                      <div className="text-gray-700 dark:text-gray-300 text-base leading-relaxed space-y-4" dangerouslySetInnerHTML={{ __html: activeSession.result.explanation }} />
+                    </div>
+
+                    {activeSession.result.videos && activeSession.result.videos.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                          <PlayCircle className="w-6 h-6 text-red-500" /> Suggested YouTube Searches
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                          {activeSession.result.videos.map((vid, i) => (
+                            <a key={i} href={`https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`} target="_blank" rel="noreferrer" className="bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl overflow-hidden group hover:border-red-500/50 hover:shadow-lg transition-all block">
+                              <div className="aspect-video bg-gradient-to-br from-red-500/20 to-purple-500/20 relative flex items-center justify-center border-b border-gray-200 dark:border-white/10">
+                                <PlayCircle className="w-12 h-12 text-red-500 opacity-80 group-hover:scale-110 transition-transform" />
+                              </div>
+                              <div className="p-4">
+                                <h4 className="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-tight">{vid.title}</h4>
+                                <p className="text-xs text-gray-500 mt-2 font-medium uppercase tracking-wider">Click to Search</p>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeSession.result.quizzes && activeSession.result.quizzes.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
+                          <FileQuestion className="w-6 h-6 text-blue-500" /> Interactive Knowledge Check
+                        </h3>
+                        <QuizInteractive quizzes={activeSession.result.quizzes} user={user} showToast={showToast} />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6 bg-white dark:bg-white/[0.02] border-t border-gray-200 dark:border-white/10">
+                   <button onClick={startNewChat} className="w-full bg-purple-50 hover:bg-purple-100 dark:bg-white/5 dark:hover:bg-white/10 text-purple-700 dark:text-white py-4 rounded-xl text-base font-bold transition-colors shadow-sm">
+                     Start a new study session
+                   </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- FEATURE 2: ACTIVE LIVE ROOM ---
+    const ActiveStudyRoom = ({ roomId, user, onLeave, showToast }) => {
+      const [messages, setMessages] = useState([]);
+      const [newMessage, setNewMessage] = useState("");
+      const [isSending, setIsSending] = useState(false);
+      const [isLocalMode, setIsLocalMode] = useState(false); 
+      const [activeTool, setActiveTool] = useState('chat');
+      const chatEndRef = useRef(null);
+
+      const roomDocRef = doc(db, 'artifacts', safeAppId, 'public', 'data', 'rooms', roomId);
+      const messagesColRef = collection(db, 'artifacts', safeAppId, 'public', 'data', 'rooms', roomId, 'messages');
+
+      useEffect(() => {
+        if (!user) return; 
+        const q = query(messagesColRef, orderBy("timestamp", "asc"));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const liveMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setMessages(liveMessages);
+          setIsLocalMode(false);
+          setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        }, (error) => {
+           console.warn("Silent Local Mode.");
+           setIsLocalMode(true);
+        });
+        return () => unsubscribe();
+      }, [roomId, user]);
+
+      const handleSendMessage = async (e) => {
+        e.preventDefault();
+        if (!newMessage.trim() || isSending || !user) return;
+        
+        const textToSend = newMessage;
+        const currentName = user.displayName || "Student User";
+        setIsSending(true); setNewMessage(""); 
+        
+        const msgObj = { text: textToSend, sender: currentName, senderUid: user.uid, photoURL: user.photoURL || null, isBot: false, timestamp: serverTimestamp() };
+
+        try {
+          if(!isLocalMode) await addDoc(messagesColRef, msgObj);
+          else setMessages(prev => [...prev, {id: Date.now().toString(), ...msgObj, timestamp: new Date()}]);
+
+          addHarmonyPoints(user.uid, 2, null); 
+
+          if (textToSend.toLowerCase().includes("@ai")) {
+            const cleanPrompt = textToSend.replace(/@ai/gi, '').trim() || "Hello!";
+            const botResponseText = await generateAIContent("You are ETHERMONY AI in a live student chat. Answer concisely (under 3 sentences).", cleanPrompt, false);
+            const botObj = { text: botResponseText, sender: "ETHERMONY AI", isBot: true, timestamp: serverTimestamp() };
+            
+            if(!isLocalMode) await addDoc(messagesColRef, botObj);
+            else setMessages(prev => [...prev, {id: (Date.now()+1).toString(), ...botObj, timestamp: new Date()}]);
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setIsSending(false); setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+        }
+      };
+
+      const SharedNotes = () => {
+        const [notes, setNotes] = useState("");
+        const [isSaving, setIsSaving] = useState(false);
+
+        useEffect(() => {
+          if (!user || isLocalMode) return;
+          const unsub = onSnapshot(roomDocRef, (docSnap) => {
+            if (docSnap.exists()) setNotes(docSnap.data().sharedNotes || "");
+          });
+          return () => unsub();
+        }, [roomId, user, isLocalMode]);
+
+        const handleChange = async (e) => {
+          const newText = e.target.value;
+          setNotes(newText);
+          if (isLocalMode) return;
+          setIsSaving(true);
+          try { await updateDoc(roomDocRef, { sharedNotes: newText }); } catch(err) {}
+          setIsSaving(false);
+        };
+
+        return (
+          <div className="h-full flex flex-col p-6 bg-gray-50 dark:bg-white/[0.01]">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-gray-900 dark:text-white font-bold flex items-center gap-2 text-lg"><Edit3 className="w-6 h-6 text-purple-500"/> Live Collaborative Notes</h4>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gray-200 dark:bg-white/10 text-gray-600 dark:text-gray-400">{isLocalMode ? "Local Mode Active" : (isSaving ? "Saving..." : "Synced to Cloud")}</span>
+            </div>
+            <textarea 
+              value={notes}
+              onChange={handleChange}
+              placeholder="Start typing... Anyone in the room will see this instantly!"
+              className="flex-grow bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-2xl p-6 text-gray-800 dark:text-white placeholder-gray-400 focus:outline-none focus:border-purple-500/50 resize-none transition-colors leading-relaxed shadow-inner"
+            ></textarea>
+          </div>
+        );
+      };
+
+      const Whiteboard = () => (
+        <div className="h-full w-full bg-white dark:bg-gray-900">
+           <iframe src={`https://excalidraw.com/#room=${roomId}`} title="Excalidraw Whiteboard" className="w-full h-full border-none"></iframe>
+        </div>
+      );
+
+      const activeMembers = Array.from(new Set(messages.filter(m => !m.isSystem && !m.isBot).map(m => JSON.stringify({ name: m.sender, uid: m.senderUid, photo: m.photoURL })))).map(s => JSON.parse(s));
+      if (!activeMembers.find(m => m.uid === user.uid)) {
+        activeMembers.unshift({ name: user.displayName || "Student User", uid: user.uid, photo: user.photoURL });
+      }
+
+      return (
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-120px)] gap-6 animate-fade-in-up">
+          <div className="flex-grow flex flex-col bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-3xl overflow-hidden relative shadow-xl dark:shadow-none">
+            
+            <div className="h-[72px] border-b border-gray-200 dark:border-white/10 flex items-center justify-between px-4 md:px-6 bg-gray-50 dark:bg-white/[0.01]">
+              <div className="flex items-center gap-4">
+                <button onClick={onLeave} className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors bg-white dark:bg-transparent shadow-sm dark:shadow-none p-2 rounded-lg border border-gray-200 dark:border-transparent"><ArrowLeft className="w-5 h-5" /></button>
+                <div className="hidden md:block">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-lg">
+                    <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div> Collab Session
+                  </h3>
+                </div>
+              </div>
+
+              <div className="flex bg-gray-200 dark:bg-black/40 rounded-xl p-1.5 border border-gray-300 dark:border-white/10">
+                <button onClick={()=>setActiveTool('chat')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTool==='chat' ? 'bg-white dark:bg-white/10 text-purple-600 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+                  <MessageSquare className="w-4 h-4" /> Chat
+                </button>
+                <button onClick={()=>setActiveTool('notes')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTool==='notes' ? 'bg-white dark:bg-white/10 text-purple-600 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+                  <Edit3 className="w-4 h-4" /> Notes
+                </button>
+                <button onClick={()=>setActiveTool('whiteboard')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${activeTool==='whiteboard' ? 'bg-white dark:bg-white/10 text-purple-600 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
+                  <PenTool className="w-4 h-4" /> Whiteboard
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-grow overflow-hidden flex flex-col bg-gray-50 dark:bg-transparent">
+              {activeTool === 'notes' && <SharedNotes />}
+              {activeTool === 'whiteboard' && <Whiteboard />}
+              
+              {activeTool === 'chat' && (
+                <>
+                  <div className="flex-grow overflow-y-auto p-4 md:p-6 space-y-6">
+                    {messages.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 text-base flex-col gap-3">
+                        <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-white/5 flex items-center justify-center mb-2"><Users className="w-8 h-8 text-gray-400 dark:text-gray-500" /></div>
+                        <p className="font-medium text-gray-900 dark:text-white">Room initialized securely.</p>
+                        <p>Share ID <strong>{roomId}</strong> or tag <strong className="text-purple-500">@ai</strong> for help!</p>
+                      </div>
+                    ) : (
+                      messages.map((msg) => {
+                        if (msg.isSystem) return <div key={msg.id} className="text-center my-4"><span className="bg-gray-200 dark:bg-white/5 border border-gray-300 dark:border-white/10 text-gray-600 dark:text-gray-400 text-xs px-4 py-1.5 rounded-full font-medium">{msg.text}</span></div>;
+                        const formatTime = (ts) => { if (!ts) return "Just now"; const date = ts.toDate ? ts.toDate() : new Date(ts); return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+                        const isMe = msg.senderUid === user?.uid;
+
+                        return (
+                          <div key={msg.id} className={`flex flex-col max-w-[85%] md:max-w-[75%] ${isMe ? 'ml-auto items-end' : 'items-start'}`}>
+                            <div className="flex items-center gap-2 mb-1.5 px-1">
+                              <span className={`text-xs font-bold flex items-center gap-2 ${msg.isBot ? 'text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                {msg.isBot ? <EthermonyLogo className="w-5 h-5 rounded-md shadow-sm" fallbackSize="w-3 h-3" /> : (msg.photoURL ? <img src={msg.photoURL} className="w-5 h-5 rounded-full object-cover border border-gray-200 dark:border-white/10 shadow-sm" /> : <UserIcon className="w-4 h-4" />)} 
+                                {msg.sender}
+                              </span>
+                              <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">{formatTime(msg.timestamp)}</span>
+                            </div>
+                            <div className={`p-4 rounded-2xl text-[15px] leading-relaxed shadow-sm ${isMe ? 'bg-purple-600 text-white rounded-tr-none' : msg.isBot ? 'bg-purple-50 dark:bg-primary/10 border border-purple-100 dark:border-primary/20 text-gray-900 dark:text-gray-200 rounded-tl-none shadow-[0_0_15px_rgba(139,92,246,0.1)]' : 'bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-300 rounded-tl-none'}`}>
+                              {msg.text}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+
+                  <div className="p-4 md:p-6 bg-white dark:bg-white/[0.01] border-t border-gray-200 dark:border-white/10">
+                    <form onSubmit={handleSendMessage} className="flex items-center gap-2 bg-gray-100 dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-2xl p-2 pr-2 focus-within:border-purple-500 focus-within:ring-4 focus-within:ring-purple-500/10 transition-all">
+                      <div className="p-3 text-purple-500"><Sparkles className="w-5 h-5" /></div>
+                      <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Type your message or ask @ai..." className="flex-grow bg-transparent border-none text-base text-gray-900 dark:text-white focus:outline-none py-2" disabled={isSending} />
+                      <button type="submit" disabled={!newMessage.trim() || isSending} className="bg-purple-600 text-white p-3 rounded-xl hover:bg-purple-700 transition-colors disabled:opacity-50 shadow-md">
+                        <Send className="w-5 h-5" />
+                      </button>
+                    </form>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="w-full lg:w-80 flex flex-col gap-6">
+            <div className="bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-3xl p-6 relative overflow-hidden shadow-xl dark:shadow-none">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 blur-[40px] pointer-events-none"></div>
+              <h4 className="text-base font-bold text-gray-900 dark:text-white mb-2">Room Key</h4>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 leading-relaxed">Share this ID for others to join.</p>
+              <div className="bg-gray-50 dark:bg-black/40 border border-gray-200 dark:border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                <span className="font-mono text-2xl text-gray-900 dark:text-white tracking-widest font-bold">{roomId}</span>
+                <button onClick={() => { navigator.clipboard.writeText(roomId); showToast("Copied!", "success") }} className="text-xs font-bold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-4 py-2 rounded-xl hover:bg-purple-200 dark:hover:bg-purple-500/40 transition-colors shadow-sm">
+                  COPY
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-3xl p-6 flex-grow shadow-xl dark:shadow-none">
+               <h4 className="text-base font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3"><Users className="w-5 h-5 text-blue-500"/> Active Members</h4>
+               <div className="space-y-5">
+                 {activeMembers.map((member, idx) => (
+                   <div key={idx} className="flex items-center gap-4">
+                     <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30 flex items-center justify-center text-sm font-bold text-purple-700 dark:text-purple-300 overflow-hidden shadow-sm">
+                       {member.photo ? <img src={member.photo} className="w-full h-full object-cover" /> : member.name[0].toUpperCase()}
+                     </div>
+                     <span className="text-sm text-gray-800 dark:text-gray-200 font-bold">{member.name} {member.uid === user.uid && <span className="text-xs text-gray-400 dark:text-gray-500 font-medium ml-1">(You)</span>}</span>
+                     <div className="ml-auto w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                   </div>
+                 ))}
+               </div>
             </div>
           </div>
         </div>
       );
     };
 
-    const Workspace = ({ onLogout }) => {
-      const [activeTab, setActiveTab] = useState('study'); 
+    // --- STUDY ROOM LOBBY ---
+    const StudyRoomsFeature = ({ user, showToast }) => {
+      const [currentRoomId, setCurrentRoomId] = useState(null);
+      const [joinId, setJoinId] = useState("");
+
+      const handleCreateRoom = async () => {
+        const newId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        try {
+          await setDoc(doc(db, 'artifacts', safeAppId, 'public', 'data', 'rooms', newId), { createdAt: serverTimestamp(), sharedNotes: "" });
+          await addDoc(collection(db, 'artifacts', safeAppId, 'public', 'data', 'rooms', newId, 'messages'), { text: `${user?.displayName || "Student"} created the room.`, isSystem: true, timestamp: serverTimestamp() });
+          setCurrentRoomId(newId);
+        } catch(err) { setCurrentRoomId(newId); }
+      };
+
+      const handleJoinRoom = async (e) => {
+        e.preventDefault();
+        const code = joinId.trim().toUpperCase();
+        if (code) {
+          try {
+            await addDoc(collection(db, 'artifacts', safeAppId, 'public', 'data', 'rooms', code, 'messages'), { text: `${user?.displayName || "Student"} joined the room.`, isSystem: true, timestamp: serverTimestamp() });
+            setCurrentRoomId(code);
+          } catch(err) { setCurrentRoomId(code); }
+        }
+      };
+
+      if (currentRoomId) return <ActiveStudyRoom roomId={currentRoomId} user={user} onLeave={() => setCurrentRoomId(null)} showToast={showToast} />;
 
       return (
-        <div className="w-full h-screen bg-[#030712] flex overflow-hidden absolute inset-0 z-[150] animate-fade-in">
-          
-          <div className="w-20 md:w-64 border-r border-white/10 bg-white/[0.02] flex flex-col">
-            <div className="h-20 flex items-center justify-center md:justify-start md:px-6 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <EthermonyLogo className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" fallbackSize="w-5 h-5" />
-                <span className="text-lg font-bold tracking-widest text-white hidden md:block">ETHERMONY</span>
+        <div className="flex flex-col h-[calc(100vh-120px)] items-center justify-center animate-fade-in-up px-4">
+          <div className="w-full max-w-3xl bg-white dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 rounded-[2rem] p-8 md:p-14 shadow-2xl relative overflow-hidden text-center">
+            <div className="w-20 h-20 rounded-3xl bg-blue-50 dark:bg-white/5 border border-blue-100 dark:border-white/10 mx-auto flex items-center justify-center mb-8 shadow-inner">
+              <Users className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">Collaborative Network</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-12 max-w-lg mx-auto text-lg">Create a secure study room to collaborate with peers, or join an existing session using a Room ID.</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+              <div className="bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 p-8 rounded-3xl hover:border-purple-400 dark:hover:border-purple-500/30 transition-colors shadow-sm flex flex-col justify-center group">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Start a Session</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">Generate a new secure room ID and invite your study group.</p>
+                <button onClick={handleCreateRoom} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-[0.98] group-hover:shadow-purple-500/25">
+                  Create New Room
+                </button>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 p-8 rounded-3xl hover:border-blue-400 dark:hover:border-blue-500/30 transition-colors shadow-sm flex flex-col justify-center">
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">Join a Session</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">Enter a 6-character Room ID to enter an active study room.</p>
+                <form onSubmit={handleJoinRoom} className="flex flex-col gap-4">
+                  <input type="text" placeholder="e.g. X7K9A2" value={joinId} onChange={(e) => setJoinId(e.target.value.toUpperCase())} maxLength={10} required className="w-full bg-white dark:bg-black/40 border border-gray-300 dark:border-white/10 rounded-xl py-4 px-4 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all font-mono text-center tracking-widest uppercase text-lg shadow-inner" />
+                  <button type="submit" className="w-full bg-gray-900 dark:bg-white/10 hover:bg-gray-800 dark:hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all active:scale-[0.98] shadow-md">
+                    Join Room
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const Workspace = ({ user }) => {
+      const [activeTab, setActiveTab] = useState('study'); 
+      const [isDark, setIsDark] = useState(true);
+      const [toastMsg, setToastMsg] = useState(null);
+
+      useEffect(() => {
+        const root = document.documentElement;
+        if (isDark) root.classList.add('dark');
+        else root.classList.remove('dark');
+      }, [isDark]);
+
+      const showToast = (msg, type) => {
+        setToastMsg({ msg, type });
+        setTimeout(() => setToastMsg(null), 3000);
+      };
+
+      const handleLogout = async () => { try { await signOut(auth); } catch (e) {} };
+
+      return (
+        <div className="w-full h-screen bg-gray-50 dark:bg-[#030712] flex overflow-hidden absolute inset-0 z-[150] transition-colors duration-300">
+          {toastMsg && <Toast message={toastMsg.msg} type={toastMsg.type} />}
+
+          {/* Sidebar */}
+          <div className="w-20 md:w-72 border-r border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.02] flex flex-col z-20 shadow-xl dark:shadow-none transition-colors duration-300">
+            <div className="h-24 flex items-center justify-center md:justify-start md:px-8 border-b border-gray-200 dark:border-white/10">
+              <div className="flex items-center gap-4">
+                <EthermonyLogo className="w-10 h-10 rounded-xl shadow-md" fallbackSize="w-6 h-6" />
+                <span className="text-xl font-black tracking-widest text-gray-900 dark:text-white hidden md:block">ETHERMONY</span>
               </div>
             </div>
 
-            <div className="flex-grow py-8 flex flex-col gap-2 px-3">
-              <button onClick={() => setActiveTab('study')} className={`flex items-center gap-3 px-3 py-3 md:px-4 rounded-xl transition-all ${activeTab === 'study' ? 'bg-primary/20 text-primary border border-primary/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-                <MessageSquare className="w-5 h-5" /> <span className="hidden md:block text-sm font-medium">AI Study Chat</span>
+            <div className="flex-grow py-8 flex flex-col gap-3 px-4">
+              <button onClick={() => setActiveTab('study')} className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${activeTab === 'study' ? 'bg-purple-100 text-purple-800 dark:bg-purple-600/20 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white border border-transparent'}`}>
+                <Brain className="w-6 h-6" /> <span className="hidden md:block text-base font-bold">Study Engine</span>
               </button>
-              
-              <button onClick={() => setActiveTab('rooms')} className={`flex items-center gap-3 px-3 py-3 md:px-4 rounded-xl transition-all ${activeTab === 'rooms' ? 'bg-primary/20 text-primary border border-primary/30' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
-                <Users className="w-5 h-5" /> <span className="hidden md:block text-sm font-medium">Study Rooms</span>
+              <button onClick={() => setActiveTab('rooms')} className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${activeTab === 'rooms' ? 'bg-purple-100 text-purple-800 dark:bg-purple-600/20 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white border border-transparent'}`}>
+                <Users className="w-6 h-6" /> <span className="hidden md:block text-base font-bold">Collab Rooms</span>
               </button>
-
-              <button className={`flex items-center gap-3 px-3 py-3 md:px-4 rounded-xl transition-all text-gray-600 cursor-not-allowed`}>
-                <LayoutDashboard className="w-5 h-5" /> <span className="hidden md:block text-sm font-medium">Progress (Locked)</span>
+              <button onClick={() => setActiveTab('leaderboard')} className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${activeTab === 'leaderboard' ? 'bg-purple-100 text-purple-800 dark:bg-purple-600/20 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white border border-transparent'}`}>
+                <Trophy className="w-6 h-6" /> <span className="hidden md:block text-base font-bold">Leaderboard</span>
               </button>
             </div>
 
-            <div className="p-4 border-t border-white/10">
-              <button onClick={onLogout} className="flex items-center justify-center md:justify-start gap-3 w-full px-3 py-3 text-red-400 hover:bg-red-400/10 rounded-xl transition-colors">
-                <LogOut className="w-5 h-5" /> <span className="hidden md:block text-sm font-medium">Sign Out</span>
+            <div className="p-6 border-t border-gray-200 dark:border-white/10">
+              <button onClick={handleLogout} className="flex items-center justify-center md:justify-start gap-4 w-full px-4 py-4 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-colors font-bold">
+                <LogOut className="w-6 h-6" /> <span className="hidden md:block text-base">Sign Out</span>
               </button>
             </div>
           </div>
 
-          <div className="flex-grow flex flex-col relative">
-            <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] bg-primary/10 rounded-full blur-[120px] pointer-events-none"></div>
-            
-            <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-transparent relative z-10">
-              <h1 className="text-xl font-bold text-white">
+          {/* Main Workspace Area */}
+          <div className="flex-grow flex flex-col relative z-10">
+            <header className="h-24 border-b border-gray-200 dark:border-white/5 flex items-center justify-between px-6 md:px-10 bg-white/50 dark:bg-transparent backdrop-blur-md relative z-10">
+              <h1 className="text-2xl font-black text-gray-900 dark:text-white">
                 {activeTab === 'study' && "AI Study Engine"}
                 {activeTab === 'rooms' && "Collaborative Network"}
+                {activeTab === 'leaderboard' && "Global Rankings"}
               </h1>
-              <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold text-white">Student User</p>
-                  <p className="text-xs text-primary font-mono">1,250 Harmony Pts</p>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center">
-                  <UserIcon className="w-5 h-5 text-gray-300" />
+              
+              <div className="flex items-center gap-6">
+                <PomodoroTimer user={user} showToast={showToast} />
+                <ThemeToggle isDark={isDark} setIsDark={setIsDark} />
+                
+                <div className="flex items-center gap-4 border-l border-gray-300 dark:border-white/10 pl-6">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{user?.displayName || "Student User"}</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-mono font-bold mt-0.5 tracking-wider">HARMONY SYSTEM</p>
+                  </div>
+                  
+                  <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-white/10 border-2 border-white dark:border-white/20 flex items-center justify-center uppercase font-bold text-gray-700 dark:text-white overflow-hidden shadow-lg">
+                    {user?.photoURL ? <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" /> : (user?.displayName ? user.displayName.charAt(0) : <UserIcon className="w-6 h-6" />)}
+                  </div>
                 </div>
               </div>
             </header>
-
+            
             <div className="flex-grow overflow-hidden p-4 md:p-8 relative z-10">
-              {activeTab === 'study' && <StudyChatFeature />}
-              {activeTab === 'rooms' && <StudyRoomsFeature />}
+              {activeTab === 'study' && <StudyChatFeature user={user} showToast={showToast} />}
+              {activeTab === 'rooms' && <StudyRoomsFeature user={user} showToast={showToast} />}
+              {activeTab === 'leaderboard' && <LeaderboardFeature />}
             </div>
           </div>
-
         </div>
       );
     };
 
-    // --- ROOT APP MANAGER ---
     function App() {
       const [currentView, setCurrentView] = useState('home');
       const [authMode, setAuthMode] = useState('login'); 
+      const [user, setUser] = useState(null);
 
-      const openAuth = (mode) => {
-        setAuthMode(mode);
-        setCurrentView('auth');
-      };
-
-      const handleLoginSuccess = () => {
-        setCurrentView('workspace');
-      };
-
-      const handleLogout = () => {
-        setCurrentView('home');
-      };
+      useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+          if (currentUser) {
+            try { 
+               const userRef = doc(db, 'artifacts', safeAppId, 'users', currentUser.uid);
+               const docSnap = await getDoc(userRef);
+               if (!docSnap.exists()) {
+                 await setDoc(userRef, { name: currentUser.displayName || "Student", photoURL: currentUser.photoURL || null, email: currentUser.email, points: 0 });
+               }
+            } catch(e){}
+            setUser(currentUser);
+            setCurrentView('workspace'); 
+          } else {
+            setUser(null);
+            setCurrentView('home');
+          }
+        });
+        return () => unsubscribe();
+      }, []);
 
       return (
-        <div className="h-screen w-screen flex flex-col relative selection:bg-primary/30 selection:text-white bg-[#030712] overflow-hidden">
-          
+        <div className="h-screen w-screen flex flex-col relative selection:bg-purple-500/30 overflow-hidden">
           {currentView !== 'workspace' && (
-            <div className="absolute inset-0 z-10 w-full h-full">
-              <nav className="fixed top-0 left-0 right-0 z-50 glass-nav h-16 pointer-events-none">
+            <div className="absolute inset-0 z-10 w-full h-full bg-[#030712]">
+              <nav className="fixed top-0 left-0 right-0 z-50 glass-nav h-20 pointer-events-none">
                 <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-                  
-                  {/* Reusable Logo Component Usage */}
                   <div className="flex items-center gap-3 cursor-pointer pointer-events-auto hover:opacity-80 transition-opacity" onClick={() => setCurrentView('home')}>
-                    <EthermonyLogo className="w-8 h-8 rounded-lg shadow-lg shadow-primary/20" fallbackSize="w-5 h-5" />
-                    <span className="text-lg font-bold tracking-widest text-white">ETHERMONY</span>
+                    <EthermonyLogo className="w-10 h-10 rounded-xl shadow-lg shadow-purple-500/20" fallbackSize="w-6 h-6" />
+                    <span className="text-xl font-black tracking-widest text-white">ETHERMONY</span>
                   </div>
-                  
                   <div className="flex items-center gap-4 pointer-events-auto">
-                    <button onClick={() => openAuth('login')} className="text-sm font-medium text-neutral-300 hover:text-white transition-colors hidden sm:block cursor-pointer">
+                    <button onClick={() => { setAuthMode('login'); setCurrentView('auth'); }} className="text-sm font-bold text-gray-300 hover:text-white transition-colors hidden sm:block cursor-pointer px-4 py-2">
                       Log in
                     </button>
-                    <button onClick={() => openAuth('signup')} className="bg-white text-black px-4 py-2 rounded-lg text-sm font-semibold hover:bg-neutral-200 transition-colors active:scale-95 cursor-pointer">
+                    <button onClick={() => { setAuthMode('signup'); setCurrentView('auth'); }} className="bg-white text-black px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-200 transition-all active:scale-95 cursor-pointer shadow-lg">
                       Sign Up
                     </button>
                   </div>
                 </div>
               </nav>
-
-              <main className="w-full h-full">
-                <SplineSceneBasic />
-              </main>
+              <main className="w-full h-full"><SplineSceneBasic /></main>
             </div>
           )}
-
-          {currentView === 'auth' && (
-            <AuthPage 
-              onBack={() => setCurrentView('home')} 
-              onLoginSuccess={handleLoginSuccess}
-              initialMode={authMode} 
-            />
-          )}
-
-          {currentView === 'workspace' && (
-            <Workspace onLogout={handleLogout} />
-          )}
-
+          {currentView === 'auth' && <AuthPage onBack={() => setCurrentView('home')} initialMode={authMode} />}
+          {currentView === 'workspace' && <Workspace user={user} />}
         </div>
       );
     }
